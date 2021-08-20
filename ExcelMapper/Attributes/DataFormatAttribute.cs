@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Ganss.Excel
 {
@@ -12,7 +9,7 @@ namespace Ganss.Excel
     /// </summary>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(AttributeTargets.Property, Inherited = true, AllowMultiple = false)]
-    public class DataFormatAttribute: Attribute
+    public sealed class DataFormatAttribute: Attribute
     {
         /// <summary>
         /// Gets or sets the builtin format, see https://poi.apache.org/apidocs/org/apache/poi/ss/usermodel/BuiltinFormats.html for possible values.

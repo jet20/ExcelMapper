@@ -1,16 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Ganss.Excel
 {
     /// <summary>
-    /// Attribute that specifies that a property should be ignored.
+    /// Attribute that specifies that the property should be serialized as JSON.
     /// </summary>
     /// <seealso cref="System.Attribute" />
     [AttributeUsage(AttributeTargets.Property, Inherited = true, AllowMultiple = false)]
-    public sealed class IgnoreAttribute : Attribute
+    public sealed class JsonAttribute : Attribute
     {
     }
 }

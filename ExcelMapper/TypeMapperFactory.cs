@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Dynamic;
 
 namespace Ganss.Excel
 {
@@ -23,6 +22,23 @@ namespace Ganss.Excel
                 typeMapper = TypeMappers[type] = TypeMapper.Create(type);
 
             return typeMapper;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="TypeMapper"/> for the specified object.
+        /// </summary>
+        /// <param name="o">The object to create a <see cref="TypeMapper"/> object for.</param>
+        /// <returns>A <see cref="TypeMapper"/> for the specified object.</returns>
+        public TypeMapper Create(object o)
+        {
+            if (o is ExpandoObject eo)
+            {
+                return TypeMapper.Create(eo);
+            }
+            else
+            {
+                return Create(o.GetType());
+            }
         }
     }
 }

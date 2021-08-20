@@ -4,21 +4,25 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/tyyg8905i24qv9pg/branch/master?svg=true)](https://ci.appveyor.com/project/mganss/excelmapper/branch/master)
 [![codecov.io](https://codecov.io/github/mganss/ExcelMapper/coverage.svg?branch=master)](https://codecov.io/github/mganss/ExcelMapper?branch=master)
 [![netstandard2.0](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)](https://img.shields.io/badge/netstandard-2.0-brightgreen.svg)
-[![net45](https://img.shields.io/badge/net-45-brightgreen.svg)](https://img.shields.io/badge/net-45-brightgreen.svg)
+[![net461](https://img.shields.io/badge/net-461-brightgreen.svg)](https://img.shields.io/badge/net-461-brightgreen.svg)
 
 A library to map [POCO](https://en.wikipedia.org/wiki/Plain_Old_CLR_Object) objects to Excel files.
 
 ## Features
 
 * Read and write Excel files
-* Uses the pure managed [NPOI](https://github.com/tonyqus/npoi) library instead of the [Jet](https://en.wikipedia.org/wiki/Microsoft_Jet_Database_Engine) database engine for Excel access
+* Uses the pure managed [NPOI](https://github.com/tonyqus/npoi) library instead of the [Jet](https://en.wikipedia.org/wiki/Microsoft_Jet_Database_Engine) database engine ([NPOI users group](https://t.me/npoidevs))
 * Map to Excel files using header rows (column names) or column indexes (no header row)
+* Map nested objects (parent/child objects)
 * Optionally skip blank lines when reading
 * Preserve formatting when saving back files
 * Optionally let the mapper track objects
 * Map columns to properties through convention, attributes or method calls
 * Use custom or builtin data formats for numeric and DateTime columns
 * Map formulas or formula results depending on property type
+* Map JSON
+* Fetch/Save dynamic objects
+* Use records
 
 ## Read objects from an Excel file
 
@@ -49,7 +53,7 @@ public class Product
 {
     [Column(1)]
     public string Name { get; set; }
-    [Column(3)]
+    [Column(Letter="C")]
     public int NumberInStock { get; set; }
     [Column(4)]
     public decimal Price { get; set; }
@@ -67,8 +71,37 @@ var excel = new ExcelMapper("products.xls");
 excel.AddMapping<Product>("Number", p => p.NumberInStock);
 excel.AddMapping<Product>(1, p => p.NumberInStock);
 excel.AddMapping(typeof(Product), "Number", "NumberInStock");
-excel.AddMapping(typeof(Product), 1, "NumberInStock");
+excel.AddMapping(typeof(Product), ExcelMapper.LetterToIndex("A"), "NumberInStock");
 ```
+
+## Multiple mappings
+
+You can map a single column to multiple properties but you need to be aware of what should happen when mapping back from objects to Excel. To specify the single property you want to map back to Excel, add `MappingDirections.ExcelToObject` in the `Column` attribute of all other properties that map to the same column. Alternatively, you can use the `FromExcelOnly()` method when mapping through method calls.
+
+```c#
+public class Product
+{
+    public decimal Price { get; set; }
+    [Column("Price", MappingDirections.ExcelToObject)]
+    public string PriceString { get; set; }
+}
+
+// or
+
+excel.AddMapping<Product>("Price", p => p.PriceString).FromExcelOnly();
+```
+
+## Dynamic mapping
+
+You don't have to specify a mapping to static types, you can also fetch a collection of dynamic objects.
+
+```c#
+var products = new ExcelMapper("products.xlsx").Fetch(); // -> IEnumerable<dynamic>
+products.First().Price += 1.0;
+```
+
+The returned dynamic objects are instances of `ExpandoObject` with an extra property called `__indexes__` that is a dictionary specifying the mapping from property names to
+column indexes. If you set the `HeaderRow` property to `false` on the `ExcelMapper` object, the property names of the returned dynamic objects will match the Excel "letter" column names, i.e. "A" for column 1 etc.
 
 ## Save objects
 
@@ -166,3 +199,78 @@ excel.AddMapping<Product>("Date", p => p.Date)
 ## Header row and data row range
 
 You can specify the row number of the header row using the property `HeaderRowNumber` (default is 0). The range of rows that are considered rows that may contain data can be specified using the properties `MinRowNumber` (default is 0) and `MaxRowNumber` (default is `int.MaxValue`). The header row doesn't have to fall within this range, e.g. you can have the header row in row 5 and the data in rows 10-20.
+
+## JSON
+
+You can easily serialize to and from JSON formatted cells by specifying the `Json` attribute or `AsJson()` method.
+
+```c#
+public class ProductJson
+{
+    [Json]
+    public Product Product { get; set; }
+}
+
+// or
+
+var excel = new ExcelMapper("products.xls");
+excel.AddMapping<ProductJson>("Product", p => p.Product).AsJson();
+```
+
+This also works with lists.
+
+```c#
+public class ProductJson
+{
+    [Json]
+    public List<Product> Products { get; set; }
+}
+```
+
+## Name normalization
+
+If the header cell values are not uniform, perhaps because they contain varying amounts of whitespace, you can specify a normalization function that will be applied to header cell
+values before mapping to property names. This can be done globally or for specific classes only.
+
+```c#
+excel.NormalizeUsing(n => Regex.Replace(n, "\w", ""));
+```
+
+This removes all whitespace so that columns with the string " First Name " map to a property named `FirstName`.
+
+## Records
+
+Records are supported. 
+If the type has no default constructor (as is the case for positional records) the constructor with the highest number of arguments is used to initialize objects. 
+This constructor must have a parameter for each of the mapped properties with the same name as the corresponding property (ignoring case). 
+The remanining parameters will receive the default value of their type.
+
+## Nested objects
+
+Nested objects are supported and should work out of the box for most use cases. For example, if you have a sheet with columns Name, Street, City, Zip, Birthday, you can map
+to the following class hierarchy without any configuration:
+
+```c#
+public class Person
+{
+    public string Name { get; set; }
+    public DateTime Birthday { get; set; }
+    public Address Address { get; set; }
+}
+
+public class Address
+{
+    public string Street { get; set; }
+    public string City { get; set; }
+    public string Zip { get; set; }
+}
+
+var customers = new ExcelMapper("customers.xlsx").Fetch<Person>();
+```
+
+This works with records, too:
+
+```c#
+public record Person(string Name, DateTime Birthday, Address Address);
+public record Address(string Street, string City, string Zip);
+```
